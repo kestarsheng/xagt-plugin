@@ -203,8 +203,10 @@ async function collectSubmissionFiles(sourcePath) {
       const relativePath = relative(sourcePath, fullPath).split(sep).join("/");
       if (entry.isSymbolicLink()) throw new Error(`symbolic links are not allowed in submitted source: ${relativePath}`);
       if (entry.isDirectory()) {
-        if (["node_modules", ".git", "dist", "build", ".next", "vendor"].includes(entry.name)) {
-          throw new Error(`generated or vendored directory is not allowed: ${relativePath}`);
+        // Included source may live in vendor/. Inspect it using the same checks
+        // as other source; a directory name cannot establish its provenance.
+        if (["node_modules", ".git", "dist", "build", ".next"].includes(entry.name)) {
+          throw new Error(`generated dependency, build output, or Git metadata directory is not allowed: ${relativePath}`);
         }
         await walk(fullPath);
         continue;
