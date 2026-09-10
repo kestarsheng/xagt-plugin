@@ -2,9 +2,9 @@
 
 ## Capability
 
-- **One-line description:** Review source code and return a structured quality report (correctness, security, performance, maintainability, best practices) so AI-generated code can be checked before merge.
+- **One-line description:** Dual-engine code review: rule-based static analysis + LLM semantic review with cross-validation, returning a structured quality report so AI-generated code can be checked before merge.
 - **Who it helps:** Developers using AI coding tools (Claude Code, Codex, Cursor) and any AI Agent that needs a code-quality gate.
-- **Capability boundary:** Accepts a single code snippet (up to 60 000 chars) plus optional language and context. Returns a JSON report with score (0-100), grade (A-D), issues, strengths and improvements. Does not execute, compile, or persist submitted code. Does not review entire repositories or run static-analysis binaries.
+- **Capability boundary:** Accepts a single code snippet (up to 60 000 chars) or a unified diff, plus optional language and context. Returns a JSON report with score (0-100), grade (A-D), issues (with source attribution: rule/llm/confirmed), strengths and improvements. The rule engine covers 22+ built-in patterns across Python, JavaScript, Java, and Go. Does not execute, compile, or persist submitted code.
 
 ## Live API
 
@@ -17,7 +17,7 @@
 ## Source and reproducibility
 
 - **Source repository:** https://github.com/kestarsheng/code-review-agent
-- **Review commit:** `64b3365f0faad5b71f6710cd5dd0356c94262d74`
+- **Review commit:** `d23b13b0eff960d777ca724ed09b41db0dd94194`
 - **Source submitted in this PR:** `source/`
 - **Run tests:** `pip install -r requirements.txt && pytest tests/ -v`
 - **Run locally:** `pip install -r requirements.txt && uvicorn app.main:app --reload`
@@ -28,12 +28,12 @@ The API must expose:
 
 ```json
 // GET /health
-{"status":"ok","commit":"64b3365f0faad5b71f6710cd5dd0356c94262d74"}
+{"status":"ok","commit":"d23b13b0eff960d777ca724ed09b41db0dd94194"}
 ```
 
 ```json
 // GET /.well-known/xagent-verification.json
-{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"64b3365f0faad5b71f6710cd5dd0356c94262d74"}
+{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"d23b13b0eff960d777ca724ed09b41db0dd94194"}
 ```
 
 ## Verification
