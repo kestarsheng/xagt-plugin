@@ -17,7 +17,7 @@
 ## Source and reproducibility
 
 - **Source repository:** https://github.com/kestarsheng/code-review-agent
-- **Review commit:** `acfc116e6b192f5a13b806153973ff1481905398`
+- **Review commit:** `3a8462a`
 - **Source submitted in this PR:** `source/`
 - **Run tests:** `pip install -r requirements.txt && pytest tests/ -v`
 - **Run locally:** `pip install -r requirements.txt && uvicorn app.main:app --reload`
@@ -28,12 +28,12 @@ The API must expose:
 
 ```json
 // GET /health
-{"status":"ok","commit":"acfc116e6b192f5a13b806153973ff1481905398"}
+{"status":"ok","commit":"3a8462a"}
 ```
 
 ```json
 // GET /.well-known/xagent-verification.json
-{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"acfc116e6b192f5a13b806153973ff1481905398"}
+{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"3a8462a"}
 ```
 
 ## Verification
