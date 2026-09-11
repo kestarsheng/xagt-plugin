@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Review commit: `c25d63d7d7ce8c9b9a22687ec6e0321d3576124a`
+- Review commit: `acfc116e6b192f5a13b806153973ff1481905398`
 - API base URL: `https://code-review-agent-ashy-six.vercel.app/v1`
 - Authentication: none
 
@@ -15,7 +15,7 @@ curl --fail --silent --show-error https://code-review-agent-ashy-six.vercel.app/
 Expected response:
 
 ```json
-{"status":"ok","commit":"c25d63d7d7ce8c9b9a22687ec6e0321d3576124a"}
+{"status":"ok","commit":"acfc116e6b192f5a13b806153973ff1481905398"}
 ```
 
 ## 2. Deployment proof
@@ -27,7 +27,7 @@ curl --fail --silent --show-error https://code-review-agent-ashy-six.vercel.app/
 Expected response:
 
 ```json
-{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"c25d63d7d7ce8c9b9a22687ec6e0321d3576124a"}
+{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"acfc116e6b192f5a13b806153973ff1481905398"}
 ```
 
 ## 3. Capability call
