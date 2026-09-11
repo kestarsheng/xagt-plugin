@@ -4,7 +4,7 @@
 
 - **One-line description:** Dual-engine code review: rule-based static analysis + LLM semantic review with cross-validation, returning a structured quality report so AI-generated code can be checked before merge.
 - **Who it helps:** Developers using AI coding tools (Claude Code, Codex, Cursor) and any AI Agent that needs a code-quality gate.
-- **Capability boundary:** Accepts a single code snippet (up to 60 000 chars), a unified diff, or multiple files (structured list), plus optional language and context. Returns a JSON report with score (0-100), grade (A-D), five-dimension scores (correctness, security, performance, maintainability, best_practice), issues (with source attribution: rule/llm/confirmed, fix_code), strengths and improvements. The rule engine covers 22+ built-in patterns across Python, JavaScript, Java, and Go. Also provides MCP tools (7 total) and a CLI for git-diff review. Does not execute, compile, or persist submitted code.
+- **Capability boundary:** Accepts a single code snippet (up to 60 000 chars), a unified diff, or multiple files (structured list), plus optional language and context. Returns a JSON report with score (0-100), grade (A-D), five-dimension scores (correctness, security, performance, maintainability, best_practice), issues (with source attribution: rule/llm/confirmed, fix_code), strengths and improvements. The rule engine covers 26 built-in rules across Python, JavaScript, Java, Go, and Rust. Also provides MCP tools (7 total) and a CLI for git-diff review. Does not execute, compile, or persist submitted code.
 
 ## Live API
 
@@ -17,7 +17,7 @@
 ## Source and reproducibility
 
 - **Source repository:** https://github.com/kestarsheng/code-review-agent
-- **Review commit:** `3a8462a`
+- **Review commit:** `465963c`
 - **Source submitted in this PR:** `source/`
 - **Run tests:** `pip install -r requirements.txt && pytest tests/ -v`
 - **Run locally:** `pip install -r requirements.txt && uvicorn app.main:app --reload`
@@ -28,19 +28,19 @@ The API must expose:
 
 ```json
 // GET /health
-{"status":"ok","commit":"3a8462a"}
+{"status":"ok","commit":"465963c"}
 ```
 
 ```json
 // GET /.well-known/xagent-verification.json
-{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"3a8462a"}
+{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"465963c"}
 ```
 
 ## Verification
 
 The reproducible call instructions and redacted example responses are in `verification/README.md`.
 
-- **Health-check result:** `{"status":"ok","commit":"64b3365..."}`
+- **Health-check result:** `{"status":"ok","commit":"465963c..."}`
 - **Capability call:** `POST /v1/review` with `{"code":"def f(x): return x/0","language":"python"}`
 - **Expected error behavior:** Empty body → 422; oversized code → 413; LLM failure → 502 `{"ok":false,"error":"..."}`.
 
