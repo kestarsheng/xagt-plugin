@@ -4,7 +4,7 @@
 
 - **One-line description:** Dual-engine code review: rule-based static analysis + LLM semantic review with cross-validation, returning a structured quality report so AI-generated code can be checked before merge.
 - **Who it helps:** Developers using AI coding tools (Claude Code, Codex, Cursor) and any AI Agent that needs a code-quality gate.
-- **Capability boundary:** Accepts a single code snippet (up to 60 000 chars) or a unified diff, plus optional language and context. Returns a JSON report with score (0-100), grade (A-D), issues (with source attribution: rule/llm/confirmed), strengths and improvements. The rule engine covers 22+ built-in patterns across Python, JavaScript, Java, and Go. Does not execute, compile, or persist submitted code.
+- **Capability boundary:** Accepts a single code snippet (up to 60 000 chars), a unified diff, or multiple files (structured list), plus optional language and context. Returns a JSON report with score (0-100), grade (A-D), five-dimension scores (correctness, security, performance, maintainability, best_practice), issues (with source attribution: rule/llm/confirmed, fix_code), strengths and improvements. The rule engine covers 22+ built-in patterns across Python, JavaScript, Java, and Go. Also provides MCP tools (7 total) and a CLI for git-diff review. Does not execute, compile, or persist submitted code.
 
 ## Live API
 
@@ -12,12 +12,12 @@
 - **Health-check URL:** https://code-review-agent-ashy-six.vercel.app/health
 - **Authentication:** none
 - **Rate limits / known limits:** Single request limited by LLM provider timeout (120 s). Max code size 60 000 chars. Free-tier hosting may cold-start.
-- **API contract:** OpenAPI at `/docs`; request `POST /v1/review` body `{"code": string, "language"?: string, "context"?: string}`, response `{"ok": true, "language": string, "model": string, "report": ReviewReport}`.
+- **API contract:** OpenAPI at `/docs`; request `POST /v1/review` body `{"code": string, "language"?: string, "context"?: string}`, response `{"ok": true, "language": string, "model": string, "report": ReviewReport}`. Also supports `POST /v1/review_diff` (unified diff input) and `POST /v1/review_files` (multi-file batch review). MCP endpoint at `/mcp` with 7 tools.
 
 ## Source and reproducibility
 
 - **Source repository:** https://github.com/kestarsheng/code-review-agent
-- **Review commit:** `d23b13b0eff960d777ca724ed09b41db0dd94194`
+- **Review commit:** `13a336d2b8242bfff8fc0655022d71493a4e4a23`
 - **Source submitted in this PR:** `source/`
 - **Run tests:** `pip install -r requirements.txt && pytest tests/ -v`
 - **Run locally:** `pip install -r requirements.txt && uvicorn app.main:app --reload`
@@ -28,12 +28,12 @@ The API must expose:
 
 ```json
 // GET /health
-{"status":"ok","commit":"d23b13b0eff960d777ca724ed09b41db0dd94194"}
+{"status":"ok","commit":"13a336d2b8242bfff8fc0655022d71493a4e4a23"}
 ```
 
 ```json
 // GET /.well-known/xagent-verification.json
-{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"d23b13b0eff960d777ca724ed09b41db0dd94194"}
+{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"13a336d2b8242bfff8fc0655022d71493a4e4a23"}
 ```
 
 ## Verification
