@@ -4,7 +4,7 @@
 
 - **One-line description:** Deterministic API breaking-change detector for AI agents — compares two OpenAPI / GraphQL / JSON Schema contracts and returns structured, reproducible findings with zero LLM dependency in the core diff.
 - **Who it helps:** Any AI agent that needs to judge whether an API change is safe or breaking before merging, publishing, or upgrading a dependency. Also useful for developers and CI pipelines that want a deterministic compatibility gate.
-- **Capability boundary:** Accepts two contract texts (old + new) as strings in OpenAPI 3.x (JSON/YAML), GraphQL SDL, or JSON Schema format, plus a format identifier and optional `use_llm` flag. Max input 200 000 chars per spec. Returns a JSON report with `breaking` (bool), `breaking_count`, `total_changes`, per-severity counts, and a `findings[]` array where each finding has `change_type`, `breaking`, `severity` (critical/major/minor/info), `location`, `summary`, `source` ("confirmed" for deterministic engine, "advisory" for optional LLM layer), and `id`. The deterministic engine covers 25+ change types across three formats. Also provides 3 MCP tools (`check_breaking_changes`, `list_supported_formats`, `explain_change_type`) and an interactive demo page. Does not execute code, call external APIs (unless LLM advisory enabled), or persist submitted contracts.
+- **Capability boundary:** Accepts two contract texts (old + new) as strings in OpenAPI 3.x (JSON/YAML), GraphQL SDL, or JSON Schema (draft-07 / 2020-12) format, plus a format identifier and optional `use_llm` flag. Max input 200 000 chars per spec. Returns a JSON report with `breaking` (bool), `breaking_count`, `total_changes`, per-severity counts, and a `findings[]` array where each finding has `change_type`, `breaking`, `severity` (critical/major/minor/info), `location`, `summary`, `source` ("confirmed" for deterministic engine, "advisory" for optional LLM layer), and `id`. The deterministic engine covers 35+ change types across three formats including content-type changes, deprecation detection, GraphQL directive changes, and JSON Schema 2020-12 keywords (prefixItems, contains, dependentRequired, unevaluatedProperties). Also provides 6 MCP tools (`check_breaking_changes`, `list_supported_formats`, `explain_change_type`, `suggest_version_bump`, `generate_changelog`, `suggest_migration`), 5 REST endpoints (`POST /v1/diff`, `POST /v1/chain-diff`, `POST /v1/semver`, `POST /v1/migration`, `POST /v1/sarif`, `POST /v1/changelog`), SARIF 2.1.0 export for GitHub Code Scanning, and an interactive demo page. Does not execute code, call external APIs (unless LLM advisory enabled), or persist submitted contracts.
 
 ## Live API
 
@@ -12,12 +12,12 @@
 - **Health-check URL:** https://contract-guard-eta.vercel.app/health
 - **Authentication:** none
 - **Rate limits / known limits:** Max spec size 200 000 chars per request. Vercel serverless 10 s timeout — sufficient for all deterministic diffs. LLM advisory layer (optional) may add latency.
-- **API contract:** OpenAPI at `/docs`; request `POST /v1/diff` body `{"format": "openapi|graphql|json-schema", "old_spec": string, "new_spec": string, "use_llm"?: bool}`, response `{"schema_version": 1, "format": string, "breaking": bool, "total_changes": int, "breaking_count": int, "counts": {...}, "summary": string, "llm_enabled": bool, "findings": [...]}`. MCP endpoint at `/mcp` with 3 tools. Demo page at `GET /`.
+- **API contract:** OpenAPI at `/docs`; request `POST /v1/diff` body `{"format": "openapi|graphql|json-schema", "old_spec": string, "new_spec": string, "use_llm"?: bool}`, response `{"schema_version": 1, "format": string, "breaking": bool, "total_changes": int, "breaking_count": int, "counts": {...}, "summary": string, "llm_enabled": bool, "findings": [...]}`. Additional endpoints: `POST /v1/chain-diff` (multi-version analysis), `POST /v1/semver` (SemVer bump), `POST /v1/migration` (migration suggestions), `POST /v1/sarif` (SARIF export), `POST /v1/changelog` (markdown changelog). MCP endpoint at `/mcp` with 6 tools. Demo page at `GET /`.
 
 ## Source and reproducibility
 
 - **Source repository:** https://github.com/kestarsheng/contract-guard
-- **Review commit:** `f052ed6c85d9e6683a77e2a17cac6ae1b48b0627`
+- **Review commit:** `ffef8703f732fd01b9c958b5d302aeed116d3844`
 - **Source submitted in this PR:** `source/`
 - **Run tests:** `pip install -r requirements.txt && pytest tests/ -v`
 - **Run locally:** `pip install -r requirements.txt && uvicorn app.main:app --reload`
@@ -28,19 +28,19 @@ The API must expose:
 
 ```json
 // GET /health
-{"status":"ok","commit":"f052ed6c85d9e6683a77e2a17cac6ae1b48b0627","service":"contract-guard","version":"1.0.0"}
+{"status":"ok","commit":"ffef8703f732fd01b9c958b5d302aeed116d3844","service":"contract-guard","version":"1.0.0"}
 ```
 
 ```json
 // GET /.well-known/xagent-verification.json
-{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"f052ed6c85d9e6683a77e2a17cac6ae1b48b0627"}
+{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"ffef8703f732fd01b9c958b5d302aeed116d3844"}
 ```
 
 ## Verification
 
 The reproducible call instructions and example responses are in `verification/README.md`.
 
-- **Health-check result:** `{"status":"ok","commit":"f052ed6c85d9e6683a77e2a17cac6ae1b48b0627","service":"contract-guard","version":"1.0.0"}`
+- **Health-check result:** `{"status":"ok","commit":"ffef8703f732fd01b9c958b5d302aeed116d3844","service":"contract-guard","version":"1.0.0"}`
 - **Capability call:** `POST /v1/diff` with `{"format":"openapi","old_spec":"...","new_spec":"..."}`
 - **Expected error behavior:** Invalid format → 400; oversized spec → 413; malformed JSON → 422.
 
