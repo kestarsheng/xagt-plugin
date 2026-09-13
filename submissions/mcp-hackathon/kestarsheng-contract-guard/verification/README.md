@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Review commit: `e45354dc626edcc04657d951b55ea4442058c3bb`
+- Review commit: `d9f757ed25e213e7b4273ba1e4402965194690d3`
 - API base URL: `https://contract-guard-eta.vercel.app/v1`
 - Authentication: none
 
@@ -15,7 +15,7 @@ curl --fail --silent --show-error https://contract-guard-eta.vercel.app/health
 Expected response:
 
 ```json
-{"status":"ok","commit":"e45354dc626edcc04657d951b55ea4442058c3bb","service":"contract-guard","version":"1.0.0"}
+{"status":"ok","commit":"d9f757ed25e213e7b4273ba1e4402965194690d3","service":"contract-guard","version":"1.0.0"}
 ```
 
 ## 2. Deployment proof
@@ -27,10 +27,10 @@ curl --fail --silent --show-error https://contract-guard-eta.vercel.app/.well-kn
 Expected response:
 
 ```json
-{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"e45354dc626edcc04657d951b55ea4442058c3bb"}
+{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"d9f757ed25e213e7b4273ba1e4402965194690d3"}
 ```
 
-## 3. Capability call â€” OpenAPI diff (non-breaking change)
+## 3. Capability call â€?OpenAPI diff (non-breaking change)
 
 ```bash
 curl --fail --silent --show-error \
@@ -65,7 +65,7 @@ Expected success response:
 }
 ```
 
-## 4. Capability call â€” OpenAPI diff (breaking change)
+## 4. Capability call â€?OpenAPI diff (breaking change)
 
 ```bash
 curl --fail --silent --show-error \
