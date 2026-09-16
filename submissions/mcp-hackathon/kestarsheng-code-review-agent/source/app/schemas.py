@@ -8,7 +8,7 @@ Severity = Literal["critical", "major", "minor", "info"]
 Category = Literal[
     "correctness", "security", "performance", "maintainability", "best_practice", "ai_pattern"
 ]
-IssueSource = Literal["rule", "llm", "confirmed"]
+IssueSource = Literal["rule", "llm", "confirmed", "ast"]
 
 
 class ReviewRequest(BaseModel):
@@ -23,6 +23,12 @@ class ReviewRequest(BaseModel):
 
 class DiffReviewRequest(BaseModel):
     diff: str = Field(..., min_length=1, description="Unified diff text to review")
+    language: str = Field(default="", description="Programming language hint")
+    context: str = Field(default="", max_length=2000, description="Optional context")
+
+
+class PullRequestReviewRequest(BaseModel):
+    url: str = Field(..., min_length=1, description="GitHub PR or commit URL")
     language: str = Field(default="", description="Programming language hint")
     context: str = Field(default="", max_length=2000, description="Optional context")
 
@@ -66,6 +72,10 @@ class ReviewReport(BaseModel):
     issues: list[ReviewIssue]
     strengths: list[str]
     improvements: list[str]
+    metrics: dict | None = Field(
+        default=None,
+        description="Deterministic quality metrics (lines, function length, cyclomatic complexity, comment ratio)",
+    )
     engine_info: dict = Field(
         default_factory=dict,
         description="Engine metadata: rule_count, llm_count, confirmed_count, languages",

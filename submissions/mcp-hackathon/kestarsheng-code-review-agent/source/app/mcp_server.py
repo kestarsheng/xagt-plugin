@@ -6,13 +6,14 @@ Tools:
 - review_diff:    dual-engine review of a unified diff / PR     [LLM]
 - review_files:   dual-engine review of multiple files          [LLM]
 - detect_security: fast rule-only security scan (instant, free)
+- analyze_metrics: deterministic quality metrics (instant, free)
 - list_rules:     list all built-in rule engine rules (instant)
 - explain_issue:  explain a rule in detail (instant, free)
 - suggest_fix:    generate corrected code for known issues      [LLM]
 
 Usage guidance for agents:
-1. Start cheap: use detect_security / list_rules / explain_issue first
-   (no LLM cost, millisecond latency).
+1. Start cheap: use detect_security / analyze_metrics / list_rules /
+   explain_issue first (no LLM cost, millisecond latency).
 2. For a full analysis call review_code / review_diff / review_files with
    detail="brief" (default) to save context tokens; use detail="full" when
    the user needs every fix suggestion.
@@ -27,6 +28,9 @@ import json
 from fastmcp import FastMCP
 
 from .config import PROJECT_SLUG
+from .github_fetch import FetchError, fetch_diff
+from .metrics import compute_metrics
+from .sarif import sarif_from_code
 from .reviewer import (
     ReviewError,
     _build_brief_report,
@@ -41,13 +45,14 @@ from .rules_engine import RULES, run_rules
 mcp = FastMCP(
     PROJECT_SLUG,
     instructions=(
-        "Dual-engine code review assistant. Rule engine + LLM semantic review "
-        "with cross-validation. Free instant tools (no LLM call): "
-        "detect_security, list_rules, explain_issue. LLM tools: review_code, "
-        "review_diff, review_files (use detail='brief' to save context unless "
-        "the user needs full details), suggest_fix. Workflow: quick scan with "
-        "detect_security first, then deep review, then explain_issue/suggest_fix "
-        "as needed."
+        "Dual-engine code review assistant. Rule engine + AST analysis + LLM "
+        "semantic review with cross-validation. Free instant tools (no LLM "
+        "call): detect_security, analyze_metrics, list_rules, explain_issue. "
+        "LLM tools: review_code, review_diff, review_files (use "
+        "detail='brief' to save context unless the user needs full details), "
+        "suggest_fix. Workflow: quick scan with detect_security and "
+        "analyze_metrics first, then deep review, then explain_issue/"
+        "suggest_fix as needed."
     ),
 )
 
@@ -126,6 +131,44 @@ def review_diff_tool(
         return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
     diff_meta = result.pop("diff_meta", {})
     return _wrap_review(result, detail, extra={"diff_meta": diff_meta})
+
+
+@mcp.tool()
+def review_pull_request(
+    url: str,
+    language: str = "",
+    context: str = "",
+    detail: str = "brief",
+) -> str:
+    """Fetch a GitHub PR/commit diff by URL and run dual-engine review.
+
+    Accepts GitHub PR or commit URLs (public repos need no token; private
+    repos read GITHUB_TOKEN from the environment). Use this when the user
+    shares a GitHub link and wants it reviewed.
+
+    Args:
+        url: GitHub PR or commit URL.
+        language: programming language hint.
+        context: optional description of the change purpose.
+        detail: "brief" (default) or "full".
+
+    Returns:
+        JSON string with diff metadata and a structured review report.
+    """
+    try:
+        diff_text, source = fetch_diff(url)
+    except FetchError as exc:
+        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+    try:
+        result = review_diff(
+            diff=diff_text, language=language, context=context or source
+        )
+    except ReviewError as exc:
+        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+    diff_meta = result.pop("diff_meta", {})
+    return _wrap_review(
+        result, detail, extra={"diff_meta": diff_meta, "source": source}
+    )
 
 
 @mcp.tool()
@@ -242,6 +285,47 @@ def detect_security(code: str, language: str = "") -> str:
                 for f in security_findings
             ],
         },
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool()
+def analyze_metrics(code: str, language: str = "") -> str:
+    """Compute deterministic code quality metrics — instant and free, no LLM.
+
+    Use this for a quantitative health check while coding: lines, function
+    length distribution, cyclomatic complexity, comment ratio, long lines.
+
+    Args:
+        code: source code to measure.
+        language: programming language hint.
+
+    Returns:
+        JSON string with the metrics object.
+    """
+    return json.dumps(
+        {"ok": True, "metrics": compute_metrics(code, language)},
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool()
+def export_sarif(code: str, language: str = "", uri: str = "snippet.py") -> str:
+    """Export deterministic findings as SARIF 2.1.0 — instant, free, CI-ready.
+
+    The output is consumable by VS Code (Sarif Viewer), GitHub Code Scanning
+    and any SARIF-aware pipeline tool. Runs rules + AST analysis only (no LLM).
+
+    Args:
+        code: source code to analyze.
+        language: programming language hint.
+        uri: artifact URI to attach findings to (e.g. 'src/main.py').
+
+    Returns:
+        JSON string of the SARIF 2.1.0 document.
+    """
+    return json.dumps(
+        sarif_from_code(code, language, uri=uri),
         ensure_ascii=False,
     )
 
