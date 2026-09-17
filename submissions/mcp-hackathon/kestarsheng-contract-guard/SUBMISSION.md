@@ -17,7 +17,7 @@
 ## Source and reproducibility
 
 - **Source repository:** https://github.com/kestarsheng/contract-guard
-- **Review commit:** `7875ed999b39bc3b9d41fa1648ec6ddfc8127b65`
+- **Review commit:** `58911406410ac51427ec48afe63f6a040b183d41`
 - **Source submitted in this PR:** `source/`
 - **Run tests:** `pip install -r requirements.txt && pytest tests/ -v`
 - **Run locally:** `pip install -r requirements.txt && uvicorn app.main:app --reload`
@@ -28,19 +28,19 @@ The API must expose:
 
 ```json
 // GET /health
-{"status":"ok","commit":"7875ed999b39bc3b9d41fa1648ec6ddfc8127b65","service":"contract-guard","version":"1.0.0"}
+{"status":"ok","commit":"58911406410ac51427ec48afe63f6a040b183d41","service":"contract-guard","version":"1.0.0"}
 ```
 
 ```json
 // GET /.well-known/xagent-verification.json
-{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"7875ed999b39bc3b9d41fa1648ec6ddfc8127b65"}
+{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"58911406410ac51427ec48afe63f6a040b183d41"}
 ```
 
 ## Verification
 
 The reproducible call instructions and example responses are in `verification/README.md`.
 
-- **Health-check result:** `{"status":"ok","commit":"7875ed999b39bc3b9d41fa1648ec6ddfc8127b65","service":"contract-guard","version":"1.0.0"}`
+- **Health-check result:** `{"status":"ok","commit":"58911406410ac51427ec48afe63f6a040b183d41","service":"contract-guard","version":"1.0.0"}`
 - **Capability call:** `POST /v1/diff` with `{"format":"openapi","old_spec":"...","new_spec":"..."}`
 - **Expected error behavior:** Invalid format �?400; oversized spec �?413; malformed JSON �?422.
 

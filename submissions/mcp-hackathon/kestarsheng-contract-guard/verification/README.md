@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Review commit: `7875ed999b39bc3b9d41fa1648ec6ddfc8127b65`
+- Review commit: `58911406410ac51427ec48afe63f6a040b183d41`
 - API base URL: `https://contract-guard-eta.vercel.app/v1`
 - Authentication: none
 
@@ -15,7 +15,7 @@ curl --fail --silent --show-error https://contract-guard-eta.vercel.app/health
 Expected response:
 
 ```json
-{"status":"ok","commit":"7875ed999b39bc3b9d41fa1648ec6ddfc8127b65","service":"contract-guard","version":"1.0.0"}
+{"status":"ok","commit":"58911406410ac51427ec48afe63f6a040b183d41","service":"contract-guard","version":"1.0.0"}
 ```
 
 ## 2. Deployment proof
@@ -27,7 +27,7 @@ curl --fail --silent --show-error https://contract-guard-eta.vercel.app/.well-kn
 Expected response:
 
 ```json
-{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"7875ed999b39bc3b9d41fa1648ec6ddfc8127b65"}
+{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"58911406410ac51427ec48afe63f6a040b183d41"}
 ```
 
 ## 3. Capability call �?OpenAPI diff (non-breaking change)
