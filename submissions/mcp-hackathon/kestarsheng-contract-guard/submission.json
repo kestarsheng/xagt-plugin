@@ -3,7 +3,7 @@
   "name": "Contract Guard",
   "slug": "kestarsheng-contract-guard",
   "sourceRepository": "https://github.com/kestarsheng/contract-guard",
-  "reviewCommit": "f3e10edbfc0be5bd17805c11cd7950cdf52b637a",
+  "reviewCommit": "7875ed999b39bc3b9d41fa1648ec6ddfc8127b65",
   "apiBaseUrl": "https://contract-guard-eta.vercel.app/v1",
   "healthCheckUrl": "https://contract-guard-eta.vercel.app/health",
   "deploymentProofUrl": "https://contract-guard-eta.vercel.app/.well-known/xagent-verification.json"
