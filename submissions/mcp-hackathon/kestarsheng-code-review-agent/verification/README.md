@@ -184,3 +184,81 @@ curl --fail --silent --show-error \
 | **5-dimension scoring** | correctness=36, security=9, performance=85, maintainability=88, best_practice=54 → composite score 46/D |
 | **Change metadata** | `files_changed` (5 files), `added_lines` (240), `removed_lines` (0) extracted from diff |
 | **12 issues total** | 2 critical + 1 major + 2 minor + 7 info — full severity spectrum exercised |
+## 6. Cross-validation confirmed (rule × LLM agree)
+
+This section demonstrates the **cross-validation** mechanism: when the rule engine and LLM independently find the same issue on the same line, `merge_findings` tags it `source: "confirmed"` and boosts confidence to 1.0.
+
+### Request
+
+```bash
+curl --fail --silent --show-error \
+  --request POST https://code-review-agent-ashy-six.vercel.app/v1/review \
+  --header "content-type: application/json" \
+  --data '{"code":"import os\napi_key = \"sk-1234567890abcdef\"\nresult = eval(user_input)\nprint(result)\nos.system(\"ls \" + filename)","language":"python","context":"AI-generated code"}'
+```
+
+**Input:** A typical AI-generated snippet — hardcoded secret, `eval()` on untrusted input, `os.system()` with string concatenation.
+
+### Response (abridged)
+
+```json
+{
+  "ok": true,
+  "model": "deepseek-chat",
+  "report": {
+    "score": 14,
+    "grade": "D",
+    "dimension_scores": {
+      "correctness": 2, "security": 0,
+      "performance": 60, "maintainability": 17, "best_practice": 12
+    },
+    "issues": [
+      {
+        "severity": "critical",
+        "category": "security",
+        "line": 3,
+        "title": "使用 eval() 执行任意代码",
+        "suggestion": "避免使用 eval()。如需解析表达式，使用 ast.literal_eval()。",
+        "fix_code": "import subprocess\nsubprocess.run([\"ls\", filename], check=True, shell=False)",
+        "source": "confirmed",
+        "rule_id": "PY-S001",
+        "confidence": 1.0
+      },
+      {
+        "severity": "major",
+        "category": "security",
+        "line": 2,
+        "title": "硬编码密钥/密码",
+        "source": "rule",
+        "rule_id": "PY-S004",
+        "confidence": 0.8
+      },
+      {
+        "severity": "major",
+        "category": "correctness",
+        "line": 3,
+        "title": "未定义输入变量导致运行时错误",
+        "source": "llm",
+        "confidence": 0.7
+      }
+    ],
+    "engine_info": {
+      "rule_count": 1,
+      "ast_count": 0,
+      "llm_count": 3,
+      "confirmed_count": 1,
+      "total_rules_run": 2,
+      "engines": ["rule", "ast", "llm"]
+    }
+  }
+}
+```
+
+### What this proves
+
+| Evidence | Detail |
+| --- | --- |
+| **`confirmed_count = 1`** | The rule engine (`PY-S001`) and LLM **independently** found `eval()` on line 3 → `merge_findings` merged them into a single `source: "confirmed"` issue |
+| **Confidence boost** | Rule confidence 0.95 + LLM agreement +0.3 → capped at `confidence: 1.0` |
+| **Cross-engine attribution** | Same report has `source: "rule"` (PY-S004 hardcoded secret, rule-only), `source: "llm"` (undefined variable, LLM-only), and `source: "confirmed"` (eval(), both engines) — all three attribution types in one response |
+| **Fix code** | The confirmed issue includes `fix_code` with a complete replacement using `subprocess.run()` with `shell=False` |
