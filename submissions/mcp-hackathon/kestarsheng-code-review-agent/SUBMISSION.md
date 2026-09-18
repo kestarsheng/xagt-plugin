@@ -4,7 +4,7 @@
 
 - **One-line description:** Triple-engine code review: rule-based static analysis + AST structural analysis + LLM semantic review with cross-validation, returning a structured quality report so AI-generated code can be checked before merge.
 - **Who it helps:** Developers using AI coding tools (Claude Code, Codex, Cursor) and any AI Agent that needs a code-quality gate.
-- **Capability boundary:** Accepts a single code snippet (up to 60 000 chars), a unified diff, multiple files (structured list), or a GitHub PR/commit URL, plus optional language and context. Returns a JSON report with score (0-100), grade (A-D), five-dimension scores (correctness, security, performance, maintainability, best_practice), issues (with source attribution: rule/ast/llm/confirmed, fix_code), strengths and improvements. The rule engine covers 40 built-in rules across 9 languages (Python, JavaScript, TypeScript, Java, Go, Rust, C/C++, Shell, PHP). AST analyzer catches structural issues (undefined vars, unused imports, duplicate defs). Also provides 9 MCP tools, 12 REST endpoints, SARIF 2.1.0 export, code quality metrics, and a CLI for git-diff review. Does not execute, compile, or persist submitted code.
+- **Capability boundary:** Accepts a single code snippet (up to 60 000 chars), a unified diff, multiple files (structured list), or a GitHub PR/commit URL, plus optional language and context. Returns a JSON report with score (0-100), grade (A-D), five-dimension scores (correctness, security, performance, maintainability, best_practice), issues (with source attribution: rule/ast/llm/confirmed, fix_code), strengths and improvements. The rule engine covers 40 built-in rules across 9 languages (Python, JavaScript, TypeScript, Java, Go, Rust, C/C++, Shell, PHP). AST analyzer catches structural issues (undefined vars, unused imports, duplicate defs). Also provides 10 MCP tools, 12 REST endpoints, SARIF 2.1.0 export, code quality metrics, and a CLI for git-diff review. Does not execute, compile, or persist submitted code.
 
 ## Live API
 
@@ -12,12 +12,12 @@
 - **Health-check URL:** https://code-review-agent-ashy-six.vercel.app/health
 - **Authentication:** none
 - **Rate limits / known limits:** Single request limited by LLM provider timeout (120 s). Max code size 60 000 chars. Free-tier hosting may cold-start.
-- **API contract:** OpenAPI at `/docs`; request `POST /v1/review` body `{"code": string, "language"?: string, "context"?: string}`, response `{"ok": true, "language": string, "model": string, "report": ReviewReport}`. Also supports `POST /v1/review_diff` (unified diff), `POST /v1/review_files` (multi-file batch), `POST /v1/review_pr` (GitHub PR URL), `POST /v1/suggest_fix` (auto-fix), `POST /v1/metrics` (code quality metrics), `POST /v1/sarif` (SARIF 2.1.0 export). MCP endpoint at `/mcp` with 9 tools.
+- **API contract:** OpenAPI at `/docs`; request `POST /v1/review` body `{"code": string, "language"?: string, "context"?: string}`, response `{"ok": true, "language": string, "model": string, "report": ReviewReport}`. Also supports `POST /v1/review_diff` (unified diff), `POST /v1/review_files` (multi-file batch), `POST /v1/review_pr` (GitHub PR URL), `POST /v1/suggest_fix` (auto-fix), `POST /v1/metrics` (code quality metrics), `POST /v1/sarif` (SARIF 2.1.0 export). MCP endpoint at `/mcp` with 10 tools.
 
 ## Source and reproducibility
 
 - **Source repository:** https://github.com/kestarsheng/code-review-agent
-- **Review commit:** `ed85265`
+- **Review commit:** `2355ff3`
 - **Source submitted in this PR:** `source/`
 - **Run tests:** `pip install -r requirements.txt && pytest tests/ -v`
 - **Run locally:** `pip install -r requirements.txt && uvicorn app.main:app --reload`
@@ -28,19 +28,19 @@ The API must expose:
 
 ```json
 // GET /health
-{"status":"ok","commit":"ed85265"}
+{"status":"ok","commit":"2355ff3"}
 ```
 
 ```json
 // GET /.well-known/xagent-verification.json
-{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"ed85265"}
+{"schemaVersion":1,"slug":"kestarsheng-code-review-agent","commit":"2355ff3"}
 ```
 
 ## Verification
 
 The reproducible call instructions and redacted example responses are in `verification/README.md`.
 
-- **Health-check result:** `{"status":"ok","commit":"ed85265..."}`
+- **Health-check result:** `{"status":"ok","commit":"2355ff3..."}`
 - **Capability call:** `POST /v1/review` with `{"code":"def f(x): return x/0","language":"python"}`
 - **Expected error behavior:** Empty body → 422; oversized code → 413; LLM failure → 502 `{"ok":false,"error":"..."}`.
 
