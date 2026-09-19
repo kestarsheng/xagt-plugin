@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Review commit: `a805036c645f9a052471f4fecf7e9c5a5a80de3c`
+- Review commit: `1970cfaf4198fb281add3d13ee6547f916777e52`
 - API base URL: `https://contract-guard-eta.vercel.app/v1`
 - Authentication: none
 
@@ -15,7 +15,7 @@ curl --fail --silent --show-error https://contract-guard-eta.vercel.app/health
 Expected response:
 
 ```json
-{"status":"ok","commit":"a805036c645f9a052471f4fecf7e9c5a5a80de3c","service":"contract-guard","version":"1.0.0"}
+{"status":"ok","commit":"1970cfaf4198fb281add3d13ee6547f916777e52","service":"contract-guard","version":"1.0.0"}
 ```
 
 ## 2. Deployment proof
@@ -27,7 +27,7 @@ curl --fail --silent --show-error https://contract-guard-eta.vercel.app/.well-kn
 Expected response:
 
 ```json
-{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"a805036c645f9a052471f4fecf7e9c5a5a80de3c"}
+{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"1970cfaf4198fb281add3d13ee6547f916777e52"}
 ```
 
 ## 3. Capability call �?OpenAPI diff (non-breaking change)
@@ -118,7 +118,7 @@ curl --fail --silent --show-error \
 Expected: HTTP 422 with validation error detail.
 ## 6. End-to-end smoke test (all endpoints, live)
 
-Captured against commit `a805036c645f9a052471f4fecf7e9c5a5a80de3c` —
+Captured against commit `1970cfaf4198fb281add3d13ee6547f916777e52` —
 the exact commit currently served by the live deployment
 (`GET /health` returns it). Live check: `GET /health` and
 `GET /v1/benchmark` were verified directly on
@@ -128,7 +128,7 @@ bit-identical output on every run.
 
 | Endpoint | Result | Key output |
 |----------|--------|------------|
-| `GET /health` | 200 | `{"status":"ok","commit":"a805036c645f9a052471f4fecf7e9c5a5a80de3c",...}` |
+| `GET /health` | 200 | `{"status":"ok","commit":"1970cfaf4198fb281add3d13ee6547f916777e52",...}` |
 | `GET /v1/formats` | 200 | `3` formats: openapi, graphql, json-schema |
 | `POST /v1/diff` (non-breaking) | 200 | `breaking:false`, 1 info change (`field_added` GET /users -> response 200.email) |
 | `POST /v1/diff` (breaking) | 200 | `breaking:true`, 1 critical (`endpoint_removed` GET /posts) |
@@ -156,7 +156,7 @@ python scripts/determinism_proof.py
 LLM_API_KEY=... LLM_BASE_URL=... LLM_MODEL=... python scripts/determinism_proof.py --with-llm
 ```
 
-Real captured output at commit `a805036c645f9a052471f4fecf7e9c5a5a80de3c`, using
+Real captured output at commit `1970cfaf4198fb281add3d13ee6547f916777e52`, using
 the Users API v1.4.0 → v2.0.0 pair (required field added + enum value added):
 
 ```text

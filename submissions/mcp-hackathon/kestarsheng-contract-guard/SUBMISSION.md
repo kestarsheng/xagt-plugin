@@ -4,7 +4,7 @@
 
 - **One-line description:** Deterministic API breaking-change detector for AI agents �?compares two OpenAPI / GraphQL / JSON Schema contracts and returns structured, reproducible findings with zero LLM dependency in the core diff.
 - **Who it helps:** Any AI agent that needs to judge whether an API change is safe or breaking before merging, publishing, or upgrading a dependency. Also useful for developers and CI pipelines that want a deterministic compatibility gate.
-- **Capability boundary:** Accepts two contract texts (old + new) as strings in OpenAPI 3.x (JSON/YAML), GraphQL SDL, or JSON Schema (draft-07 / 2020-12) format, plus a format identifier and optional `use_llm` flag. Max input 200 000 chars per spec. Returns a JSON report with `breaking` (bool), `breaking_count`, `total_changes`, per-severity counts, and a `findings[]` array where each finding has `change_type`, `breaking`, `severity` (critical/major/minor/info), `location`, `summary`, `source` ("confirmed" for deterministic engine, "advisory" for optional LLM layer), and `id`. The deterministic engine covers 35+ change types across three formats including content-type changes, deprecation detection, GraphQL directive changes, and JSON Schema 2020-12 keywords (prefixItems, contains, dependentRequired, unevaluatedProperties). Also provides 9 MCP tools (`check_breaking_changes`, `list_supported_formats`, `explain_change_type`, `suggest_version_bump`, `generate_changelog`, `suggest_migration`, `scan_consumer_impact`, `run_benchmark`, `check_gate`), 9 REST endpoints (`POST /v1/diff`, `POST /v1/chain-diff`, `POST /v1/semver`, `POST /v1/migration`, `POST /v1/sarif`, `POST /v1/changelog`, `POST /v1/consumer-scan`, `POST /v1/gate`, `GET /v1/benchmark`), SARIF 2.1.0 export for GitHub Code Scanning, consumer-aware impact scan (separates findings that hit a specific caller's subset from ignorable ones), transitive propagation (annotates each finding with affected operations via schema->operation reference graph), a 16-sample regression benchmark corpus with precision/recall/F1 scoring, a CI compatibility gate (`POST /v1/gate` turns diff findings into a pass/block decision with policy knobs `allow_breaking`, `max_severity`, `consumer_profile`), and an 8-tab interactive demo workbench covering all eight REST endpoints (breaking diff, chain diff, SemVer, migrations, SARIF, changelog, consumer-aware impact scan, regression benchmark). Does not execute code, call external APIs (unless LLM advisory enabled), or persist submitted contracts.
+- **Capability boundary:** Accepts two contract texts (old + new) as strings in OpenAPI 3.x (JSON/YAML), GraphQL SDL, or JSON Schema (draft-07 / 2020-12) format, plus a format identifier and optional `use_llm` flag. Max input 200 000 chars per spec. Returns a JSON report with `breaking` (bool), `breaking_count`, `total_changes`, per-severity counts, and a `findings[]` array where each finding has `change_type`, `breaking`, `severity` (critical/major/minor/info), `location`, `summary`, `source` ("confirmed" for deterministic engine, "advisory" for optional LLM layer), and `id`. The deterministic engine covers 35+ change types across three formats including content-type changes, deprecation detection, GraphQL directive changes, and JSON Schema 2020-12 keywords (prefixItems, contains, dependentRequired, unevaluatedProperties). Also provides 9 MCP tools (`check_breaking_changes`, `list_supported_formats`, `explain_change_type`, `suggest_version_bump`, `generate_changelog`, `suggest_migration`, `scan_consumer_impact`, `run_benchmark`, `check_gate`), 9 REST endpoints (`POST /v1/diff`, `POST /v1/chain-diff`, `POST /v1/semver`, `POST /v1/migration`, `POST /v1/sarif`, `POST /v1/changelog`, `POST /v1/consumer-scan`, `POST /v1/gate`, `GET /v1/benchmark`), SARIF 2.1.0 export for GitHub Code Scanning, consumer-aware impact scan (separates findings that hit a specific caller's subset from ignorable ones), transitive propagation (annotates each finding with affected operations via schema->operation reference graph), a 16-sample regression benchmark corpus with precision/recall/F1 scoring, a CI compatibility gate (`POST /v1/gate` turns diff findings into a pass/block decision with policy knobs `allow_breaking`, `max_severity`, `consumer_profile`), and an 8-tab interactive demo workbench (breaking diff, chain diff, SemVer, migrations, SARIF, changelog, consumer-aware impact scan, regression benchmark). Does not execute code, call external APIs (unless LLM advisory enabled), or persist submitted contracts.
 
 ## Live API
 
@@ -17,7 +17,7 @@
 ## Source and reproducibility
 
 - **Source repository:** https://github.com/kestarsheng/contract-guard
-- **Review commit:** `a805036c645f9a052471f4fecf7e9c5a5a80de3c`
+- **Review commit:** `1970cfaf4198fb281add3d13ee6547f916777e52`
 - **Source submitted in this PR:** `source/`
 - **Run tests:** `pip install -r requirements.txt && pytest tests/ -v`
 - **Run locally:** `pip install -r requirements.txt && uvicorn app.main:app --reload`
@@ -28,19 +28,19 @@ The API must expose:
 
 ```json
 // GET /health
-{"status":"ok","commit":"a805036c645f9a052471f4fecf7e9c5a5a80de3c","service":"contract-guard","version":"1.0.0"}
+{"status":"ok","commit":"1970cfaf4198fb281add3d13ee6547f916777e52","service":"contract-guard","version":"1.0.0"}
 ```
 
 ```json
 // GET /.well-known/xagent-verification.json
-{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"a805036c645f9a052471f4fecf7e9c5a5a80de3c"}
+{"schemaVersion":1,"slug":"kestarsheng-contract-guard","commit":"1970cfaf4198fb281add3d13ee6547f916777e52"}
 ```
 
 ## Verification
 
 The reproducible call instructions and example responses are in `verification/README.md`.
 
-- **Health-check result:** `{"status":"ok","commit":"a805036c645f9a052471f4fecf7e9c5a5a80de3c","service":"contract-guard","version":"1.0.0"}`
+- **Health-check result:** `{"status":"ok","commit":"1970cfaf4198fb281add3d13ee6547f916777e52","service":"contract-guard","version":"1.0.0"}`
 - **Capability call:** `POST /v1/diff` with `{"format":"openapi","old_spec":"...","new_spec":"..."}`
 - **Expected error behavior:** Invalid format �?400; oversized spec �?413; malformed JSON �?422.
 
