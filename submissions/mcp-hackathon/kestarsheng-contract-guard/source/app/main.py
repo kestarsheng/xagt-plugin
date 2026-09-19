@@ -20,8 +20,11 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from .benchmark import run_benchmark
 from .config import PROJECT_NAME, PROJECT_SLUG, PROJECT_VERSION, get_settings
 from .diff_core import DiffError, detect_changes, normalize_format
+from .gate import evaluate_gate
+from .impact import scan_consumer_impact
 from .migration import suggest_migration
 from .mcp_server import mcp
 from .models import SUPPORTED_FORMATS
@@ -30,10 +33,12 @@ from .schemas import (
     ChainDiffRequest,
     ChainDiffResponse,
     ChainDiffStepResponse,
+    ConsumerScanRequest,
     DiffRequest,
     DiffResponse,
     ErrorResponse,
     FindingResponse,
+    GateRequest,
     HealthResponse,
     MigrationResponse,
     MigrationSuggestionResponse,
@@ -99,6 +104,9 @@ def api_index() -> dict:
             "POST /v1/semver": "suggest SemVer bump from a diff result",
             "POST /v1/migration": "generate migration suggestions for breaking changes",
             "POST /v1/sarif": "export diff results as SARIF 2.1.0",
+            "POST /v1/consumer-scan": "consumer-aware impact scan + transitive propagation",
+            "POST /v1/gate": "CI gate: pass/block a contract change against a policy",
+            "GET /v1/benchmark": "run the built-in regression corpus (precision/recall/F1)",
             "GET /v1/formats": "list supported contract formats",
             "GET /health": "health check (deployed commit)",
             "GET /.well-known/xagent-verification.json": "deployment proof",
@@ -274,6 +282,75 @@ async def generate_changelog_endpoint(req: DiffRequest) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"changelog": generate_changelog(report)}
+
+
+@app.post("/v1/consumer-scan", tags=["analysis"])
+async def consumer_scan(req: ConsumerScanRequest) -> dict:
+    """Consumer-aware impact scan: which findings hit a specific caller."""
+    total_chars = len(req.old_spec) + len(req.new_spec)
+    if total_chars > settings.max_spec_chars:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Contract text too large (limit {settings.max_spec_chars} chars).",
+        )
+    try:
+        normalize_format(req.format)
+    except DiffError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        result = await asyncio.to_thread(
+            scan_consumer_impact,
+            req.old_spec,
+            req.new_spec,
+            req.format,
+            req.consumer_profile,
+            use_llm=req.use_llm and bool(settings.llm_api_key),
+        )
+    except DiffError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result
+
+
+@app.post("/v1/gate", tags=["analysis"])
+async def gate(req: GateRequest) -> dict:
+    """CI gate: decide pass/block for a contract change against a policy.
+
+    Combines the deterministic diff with an optional consumer subset. Default
+    policy blocks on any breaking change; ``max_severity`` raises the
+    threshold (only stricter severities block); ``consumer_profile`` narrows
+    evaluation to the caller's own paths/schemas/fields.
+    """
+    total_chars = len(req.old_spec) + len(req.new_spec)
+    if total_chars > settings.max_spec_chars:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Contract text too large (limit {settings.max_spec_chars} chars).",
+        )
+    try:
+        normalize_format(req.format)
+    except DiffError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        result = await asyncio.to_thread(
+            evaluate_gate,
+            req.old_spec,
+            req.new_spec,
+            req.format,
+            allow_breaking=req.allow_breaking,
+            max_severity=req.max_severity,
+            consumer_profile=req.consumer_profile,
+        )
+    except DiffError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result
+
+
+@app.get("/v1/benchmark", tags=["analysis"])
+async def benchmark() -> dict:
+    """Run the built-in regression corpus and report precision/recall/F1."""
+    return await asyncio.to_thread(run_benchmark)
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)

@@ -22,7 +22,10 @@ import json
 from fastmcp import FastMCP
 
 from .config import PROJECT_SLUG, get_settings
+from .benchmark import run_benchmark as _run_benchmark
 from .diff_core import DiffError, detect_changes, normalize_format
+from .gate import evaluate_gate as _evaluate_gate
+from .impact import scan_consumer_impact as _scan_consumer_impact
 from .migration import suggest_migration as _suggest_migration
 from .models import SUPPORTED_FORMATS
 from .semver import generate_changelog as _generate_changelog
@@ -41,7 +44,13 @@ mcp = FastMCP(
         "explain_change_type to interpret a change_type you don't recognize. "
         "Use suggest_version_bump to determine the SemVer increment level. "
         "Use generate_changelog to produce a markdown changelog for release notes. "
-        "Use suggest_migration to get concrete advice on restoring compatibility."
+        "Use suggest_migration to get concrete advice on restoring compatibility. "
+        "Use scan_consumer_impact to check whether a change affects the specific "
+        "paths/schemas/fields YOUR agent depends on (and to see the transitive "
+        "blast radius of component-schema changes). Use check_gate to make a "
+        "pass/block merge decision against a policy (max_severity or "
+        "consumer_profile). Use run_benchmark to verify "
+        "the engines' precision/recall on the built-in regression corpus."
     ),
 )
 
@@ -261,6 +270,124 @@ def suggest_migration(
     except DiffError as exc:
         return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
     result = _suggest_migration(report)
+    return json.dumps({"ok": True, **result}, ensure_ascii=False)
+
+
+@mcp.tool()
+def scan_consumer_impact(
+    old_spec: str,
+    new_spec: str,
+    format: str = "openapi",
+    consumer_profile: str = "{}",
+) -> str:
+    """Consumer-aware impact scan: which changes affect a specific caller.
+
+    Answers "is this upgrade breaking FOR ME?" instead of the generic "is it
+    breaking?". Pass a JSON consumer_profile listing the paths, schemas or
+    fields your agent actually uses. Findings outside that subset are reported
+    as ignorable -- the classic tools report the full diff with no notion of a
+    caller. Also returns the transitive blast radius: a change to a referenced
+    component schema is propagated to every operation that uses it.
+
+    Args:
+        old_spec: the previous contract text.
+        new_spec: the new contract text.
+        format: "openapi" | "graphql" | "json-schema".
+        consumer_profile: JSON string, e.g.
+            {"paths": ["/pets"], "schemas": ["Pet"], "fields": ["Pet.age"]}.
+            Omit or pass {} for a full (non-filtered) impact report.
+
+    Returns:
+        JSON string: {breaking, consumer_aware, consumer_affected,
+        consumer_breaking_count, hit_count, miss_count, hits[], misses[],
+        impact{affected_operations, schema_to_operations}, summary}.
+        Each hit/miss carries change_type, location, severity, breaking and
+        the transitively affected operations.
+    """
+    settings = get_settings()
+    try:
+        profile = json.loads(consumer_profile or "{}")
+        if not isinstance(profile, dict):
+            return json.dumps({"ok": False, "error": "consumer_profile must be a JSON object"}, ensure_ascii=False)
+    except ValueError as exc:
+        return json.dumps({"ok": False, "error": f"Invalid consumer_profile JSON: {exc}"}, ensure_ascii=False)
+    try:
+        result = _scan_consumer_impact(
+            old_spec, new_spec, format, profile,
+            use_llm=False,
+        )
+    except DiffError as exc:
+        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+    return json.dumps({"ok": True, "report": result}, ensure_ascii=False)
+
+
+@mcp.tool()
+def run_benchmark() -> str:
+    """Run the built-in regression corpus and report engine precision/recall/F1.
+
+    Replays every labelled old/new contract pair in the corpus through the
+    deterministic engines and reports accuracy, precision, recall and F1 for
+    breaking-change detection. Deterministic: the score is identical on every
+    run, which makes the engines' correctness verifiable by judges.
+
+    Returns:
+        JSON string: {total_samples, correct, accuracy, precision, recall, f1,
+        confusion, results[]}.
+    """
+    report = _run_benchmark()
+    return json.dumps({"ok": True, **report}, ensure_ascii=False)
+
+
+@mcp.tool()
+def check_gate(
+    old_spec: str,
+    new_spec: str,
+    format: str = "openapi",
+    max_severity: str = "",
+    allow_breaking: bool = False,
+    consumer_profile: str = "{}",
+) -> str:
+    """Decide pass/block for a contract change in a CI gate.
+
+    Combines the deterministic diff with an optional consumer subset and
+    returns a single decision: is this change safe to merge? Default policy
+    blocks on any breaking change. Use max_severity to allow non-critical
+    breaking changes through (e.g. "major" blocks only critical), or pass a
+    consumer_profile to evaluate only findings that affect YOUR subset.
+
+    Args:
+        old_spec: the previous contract text.
+        new_spec: the new contract text.
+        format: "openapi" | "graphql" | "json-schema".
+        max_severity: threshold severity ("info"|"minor"|"major"|"critical");
+            only findings STRICTER than this block the gate. Empty string
+            means block on any breaking change.
+        allow_breaking: if true, never block (informational only).
+        consumer_profile: JSON string, e.g.
+            {"paths": ["/users"], "schemas": ["User"]}. Only findings that
+            hit this consumer are considered.
+
+    Returns:
+        JSON string: {ok, passed, blocked_by[], policy, breaking_count,
+        total_changes, summary, diff_summary}.
+    """
+    try:
+        profile = json.loads(consumer_profile or "{}")
+        if not isinstance(profile, dict):
+            return json.dumps({"ok": False, "error": "consumer_profile must be a JSON object"}, ensure_ascii=False)
+    except ValueError as exc:
+        return json.dumps({"ok": False, "error": f"Invalid consumer_profile JSON: {exc}"}, ensure_ascii=False)
+    try:
+        result = _evaluate_gate(
+            old_spec,
+            new_spec,
+            format,
+            allow_breaking=allow_breaking or None,
+            max_severity=max_severity or None,
+            consumer_profile=profile or None,
+        )
+    except DiffError as exc:
+        return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
     return json.dumps({"ok": True, **result}, ensure_ascii=False)
 
 
